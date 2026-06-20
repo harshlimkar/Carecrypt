@@ -1,0 +1,79 @@
+name: carecrypt
+description: CareCrypt - Your Health. Your Data. Your Control.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase (Auth + DB + Storage + Realtime)
+  supabase_flutter: ^2.8.4
+
+  # State Management
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.7
+  bloc: ^9.0.0
+
+  # Navigation
+  go_router: ^15.1.2
+
+  # Cryptography
+  cryptography: ^2.7.0
+  flutter_secure_storage: ^9.2.4
+
+  # Biometric Auth
+  local_auth: ^2.3.0
+
+  # NFC
+  nfc_manager: ^3.3.1
+
+  # QR
+  mobile_scanner: ^7.0.1
+  qr_flutter: ^4.1.0
+
+  # HTTP Client (Ollama / backend)
+  dio: ^5.8.0+1
+
+  # Firebase & Notifications
+  firebase_core: ^3.13.1
+  firebase_messaging: ^15.2.5
+  flutter_local_notifications: ^18.0.1
+
+  # UI Enhancements
+  shimmer: ^3.0.0
+  cached_network_image: ^3.4.1
+  image_picker: ^1.1.2
+  image: ^4.3.0
+  google_fonts: ^6.2.1
+
+  # Utilities
+  uuid: ^4.5.1
+  intl: ^0.20.2
+  path_provider: ^2.1.5
+  flutter_dotenv: ^5.2.1
+  permission_handler: ^11.4.0
+  convert: ^3.1.2
+
+  # PDF Generation & Viewer
+  pdf: ^3.11.0
+  printing: ^5.13.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  bloc_test: ^10.0.0
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/lottie/
+    - .env
+
