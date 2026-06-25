@@ -9,7 +9,6 @@ class PdfService {
   static const _secondary = PdfColor.fromInt(0xFF34A853);
   static const _darkText  = PdfColor.fromInt(0xFF202124);
   static const _mutedText = PdfColor.fromInt(0xFF5F6368);
-  static const _surface   = PdfColor.fromInt(0xFFF8F9FA);
   static const _border    = PdfColor.fromInt(0xFFDEE2E6);
 
   /// Build a professional lab report PDF.
@@ -34,15 +33,15 @@ class PdfService {
         header: (ctx) => _buildHeader(ctx),
         footer: (ctx) => _buildFooter(ctx),
         build: (ctx) => [
-          _buildPatientSection(reportData),
+          ..._buildPatientSection(reportData),
           pw.SizedBox(height: 16),
-          _buildLabInfoSection(reportData),
+          ..._buildLabInfoSection(reportData),
           pw.SizedBox(height: 16),
-          _buildResultsSection(reportData),
+          ..._buildResultsSection(reportData),
           pw.SizedBox(height: 16),
-          _buildObservationsSection(reportData),
+          ..._buildObservationsSection(reportData),
           pw.SizedBox(height: 16),
-          _buildDoctorReferenceSection(reportData),
+          ..._buildDoctorReferenceSection(reportData),
           pw.SizedBox(height: 20),
           _buildSecuritySection(reportData),
         ],
@@ -66,31 +65,44 @@ class PdfService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  'CARECRYPT',
+                  'CARECRYPT HEALTHCARE',
                   style: pw.TextStyle(
-                    fontSize: 22,
+                    fontSize: 15,
                     fontWeight: pw.FontWeight.bold,
                     color: _primary,
-                    letterSpacing: 2,
+                    letterSpacing: 1.5,
                   ),
                 ),
+                pw.SizedBox(height: 2),
                 pw.Text(
-                  'Healthcare Report',
-                  style: pw.TextStyle(fontSize: 11, color: _mutedText),
+                  'SECURE DIGITAL MEDICAL REPORT',
+                  style: pw.TextStyle(fontSize: 8, color: _mutedText, letterSpacing: 1.0),
                 ),
               ],
             ),
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
-                pw.Text('CONFIDENTIAL', style: pw.TextStyle(color: PdfColors.red700, fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                pw.Text('Page ${ctx.pageNumber} of ${ctx.pagesCount}', style: pw.TextStyle(color: _mutedText, fontSize: 9)),
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColor.fromInt(0xFFC53030), width: 1), // red-700
+                    borderRadius: pw.BorderRadius.circular(2),
+                  ),
+                  child: pw.Text(
+                    'CONFIDENTIAL',
+                    style: pw.TextStyle(color: PdfColor.fromInt(0xFFC53030), fontSize: 8, fontWeight: pw.FontWeight.bold, letterSpacing: 0.5),
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text('Page ${ctx.pageNumber} of ${ctx.pagesCount}', style: pw.TextStyle(color: _mutedText, fontSize: 8)),
               ],
             ),
           ],
         ),
-        pw.Divider(color: _primary, thickness: 1.5),
-        pw.SizedBox(height: 4),
+        pw.SizedBox(height: 6),
+        pw.Divider(color: _primary, thickness: 1.0),
+        pw.SizedBox(height: 8),
       ],
     );
   }
@@ -119,127 +131,246 @@ class PdfService {
   // ────────────────────────────────────────────────────────
   // Patient Information Section
   // ────────────────────────────────────────────────────────
-  static pw.Widget _buildPatientSection(Map<String, dynamic> data) {
+  static List<pw.Widget> _buildPatientSection(Map<String, dynamic> data) {
     return _sectionCard(
       title: 'Patient Information',
-      icon: '👤',
       color: _primary,
-      children: [
-        _infoGrid([
-          _InfoItem('Patient ID', data['patient_id']?.toString() ?? '—'),
-          _InfoItem('Name', data['patient_name']?.toString() ?? data['name']?.toString() ?? '—'),
-          _InfoItem('Age', data['age']?.toString() ?? '—'),
-          _InfoItem('Gender', data['gender']?.toString() ?? '—'),
-          _InfoItem('Blood Group', data['blood_type']?.toString() ?? '—'),
-          _InfoItem('Report Date', _formatDate(DateTime.now())),
-        ]),
-      ],
+      children: _infoGrid([
+        _InfoItem('Patient ID', data['patient_id']?.toString() ?? '—'),
+        _InfoItem('Name', data['patient_name']?.toString() ?? data['name']?.toString() ?? '—'),
+        _InfoItem('Age', data['age']?.toString() ?? '—'),
+        _InfoItem('Gender', data['gender']?.toString() ?? '—'),
+        _InfoItem('Blood Group', data['blood_type']?.toString() ?? '—'),
+        _InfoItem('Report Date', _formatDate(DateTime.now())),
+      ]),
     );
   }
 
   // ────────────────────────────────────────────────────────
   // Laboratory Information Section
   // ────────────────────────────────────────────────────────
-  static pw.Widget _buildLabInfoSection(Map<String, dynamic> data) {
+  static List<pw.Widget> _buildLabInfoSection(Map<String, dynamic> data) {
     return _sectionCard(
       title: 'Laboratory Information',
-      icon: '🔬',
       color: _secondary,
-      children: [
-        _infoGrid([
-          _InfoItem('Test Name', data['test_name']?.toString() ?? data['test_type']?.toString() ?? '—'),
-          _InfoItem('Test Date', data['test_date']?.toString() ?? _formatDate(DateTime.now())),
-          _InfoItem('Technician', data['technician_name']?.toString() ?? data['lab_id']?.toString() ?? '—'),
-          _InfoItem('Lab ID', data['lab_id']?.toString() ?? '—'),
-          _InfoItem('Request ID', data['request_id']?.toString() ?? '—'),
-          _InfoItem('Status', 'Completed'),
-        ]),
-      ],
+      children: _infoGrid([
+        _InfoItem('Test Name', data['test_name']?.toString() ?? data['test_type']?.toString() ?? '—'),
+        _InfoItem('Test Date', data['test_date']?.toString() ?? _formatDate(DateTime.now())),
+        _InfoItem('Technician', data['technician_name']?.toString() ?? data['lab_id']?.toString() ?? '—'),
+        _InfoItem('Lab ID', data['lab_id']?.toString() ?? '—'),
+        _InfoItem('Request ID', data['request_id']?.toString() ?? '—'),
+        _InfoItem('Status', 'Completed'),
+      ]),
     );
   }
 
   // ────────────────────────────────────────────────────────
   // Test Results Section
   // ────────────────────────────────────────────────────────
-  static pw.Widget _buildResultsSection(Map<String, dynamic> data) {
-    final result = data['test_result']?.toString() ?? '—';
+  static List<pw.Widget> _buildResultsSection(Map<String, dynamic> data) {
+    final resultStr = data['test_result']?.toString() ?? '—';
+    final lines = resultStr.split('\n');
+    final tableRows = <pw.TableRow>[];
+
+    // Table Header Row
+    tableRows.add(
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(
+          color: PdfColor.fromInt(0xFFF1F5F9), // slate-100
+        ),
+        children: [
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(6),
+            child: pw.Text('TEST PARAMETER', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: _darkText)),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(6),
+            child: pw.Text('RESULT VALUE', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: _darkText)),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(6),
+            child: pw.Text('REFERENCE RANGE', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: _darkText)),
+          ),
+        ],
+      ),
+    );
+
+    bool hasTableData = false;
+    final List<pw.Widget> textBlocks = [];
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+
+      if (trimmed.startsWith('🔓') || trimmed.startsWith('🔑') || trimmed.contains('EXTRACTION') || trimmed.contains('DECRYPTION') || trimmed.startsWith('──')) {
+        textBlocks.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 4),
+            child: pw.Text(
+              trimmed,
+              style: pw.TextStyle(
+                fontSize: 8.5,
+                fontWeight: trimmed.startsWith('──') ? pw.FontWeight.normal : pw.FontWeight.bold,
+                color: trimmed.startsWith('──') ? _mutedText : PdfColor.fromInt(0xFF15803D), // dark green
+              ),
+            ),
+          ),
+        );
+        continue;
+      }
+
+      if (trimmed.endsWith(':') || trimmed.contains('PROFILE:')) {
+        textBlocks.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 8, bottom: 4),
+            child: pw.Text(
+              trimmed,
+              style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: _primary),
+            ),
+          ),
+        );
+        continue;
+      }
+
+      // Try to parse standard line: "Parameter: Value (Normal: Range)" or "Parameter: Value"
+      final colonIndex = trimmed.indexOf(':');
+      if (colonIndex != -1) {
+        final param = trimmed.substring(0, colonIndex).trim();
+        final rest = trimmed.substring(colonIndex + 1).trim();
+
+        var value = rest;
+        var range = '—';
+
+        final parenIndex = rest.indexOf('(');
+        if (parenIndex != -1) {
+          value = rest.substring(0, parenIndex).trim();
+          var rangeContent = rest.substring(parenIndex + 1).trim();
+          if (rangeContent.endsWith(')')) {
+            rangeContent = rangeContent.substring(0, rangeContent.length - 1).trim();
+          }
+          if (rangeContent.startsWith('Normal:')) {
+            range = rangeContent.substring(7).trim();
+          } else {
+            range = rangeContent;
+          }
+        }
+
+        hasTableData = true;
+        tableRows.add(
+          pw.TableRow(
+            children: [
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(6),
+                child: pw.Text(param, style: pw.TextStyle(fontSize: 8.5, color: _darkText)),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(6),
+                child: pw.Text(value, style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: _darkText)),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(6),
+                child: pw.Text(range, style: pw.TextStyle(fontSize: 8.5, color: _mutedText)),
+              ),
+            ],
+          ),
+        );
+      } else {
+        textBlocks.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 2),
+            child: pw.Text(trimmed, style: pw.TextStyle(fontSize: 8.5, color: _darkText)),
+          ),
+        );
+      }
+    }
+
+    final childrenWidgets = <pw.Widget>[];
+    if (textBlocks.isNotEmpty) {
+      childrenWidgets.addAll(textBlocks);
+      childrenWidgets.add(pw.SizedBox(height: 8));
+    }
+
+    if (hasTableData) {
+      childrenWidgets.add(
+        pw.Table(
+          border: pw.TableBorder.all(color: const PdfColor.fromInt(0xFFE2E8F0), width: 0.5),
+          columnWidths: const {
+            0: pw.FlexColumnWidth(2),
+            1: pw.FlexColumnWidth(1.2),
+            2: pw.FlexColumnWidth(1.3),
+          },
+          children: tableRows,
+        ),
+      );
+    } else {
+      childrenWidgets.add(
+        pw.Text(
+          resultStr,
+          style: pw.TextStyle(fontSize: 9, color: _darkText, lineSpacing: 1.4),
+        ),
+      );
+    }
+
     return _sectionCard(
       title: 'Test Results',
-      icon: '📊',
       color: _primary,
-      children: [
-        pw.Container(
-          decoration: pw.BoxDecoration(
-            color: _surface,
-            borderRadius: pw.BorderRadius.circular(6),
-          ),
-          padding: const pw.EdgeInsets.all(12),
-          child: pw.Text(
-            result,
-            style: pw.TextStyle(fontSize: 11, color: _darkText, lineSpacing: 1.6),
-          ),
-        ),
-      ],
+      children: childrenWidgets,
     );
   }
 
   // ────────────────────────────────────────────────────────
   // Observations Section
   // ────────────────────────────────────────────────────────
-  static pw.Widget _buildObservationsSection(Map<String, dynamic> data) {
+  static List<pw.Widget> _buildObservationsSection(Map<String, dynamic> data) {
     final obs = data['observation']?.toString() ?? '—';
     final remarks = data['remarks']?.toString() ?? '';
+    final childrenList = <pw.Widget>[
+      pw.Text('OBSERVATIONS', style: pw.TextStyle(fontSize: 8.5, color: _mutedText, fontWeight: pw.FontWeight.bold, letterSpacing: 0.5)),
+      pw.SizedBox(height: 3),
+      pw.Text(obs, style: pw.TextStyle(fontSize: 10, color: _darkText, lineSpacing: 1.5)),
+    ];
+    
+    if (remarks.isNotEmpty) {
+      childrenList.addAll([
+        pw.SizedBox(height: 10),
+        pw.Text('ADDITIONAL REMARKS', style: pw.TextStyle(fontSize: 8.5, color: _mutedText, fontWeight: pw.FontWeight.bold, letterSpacing: 0.5)),
+        pw.SizedBox(height: 3),
+        pw.Text(remarks, style: pw.TextStyle(fontSize: 10, color: _darkText, lineSpacing: 1.5)),
+      ]);
+    }
     return _sectionCard(
       title: 'Clinical Observations',
-      icon: '📋',
       color: _secondary,
-      children: [
-        pw.Text('Observations', style: pw.TextStyle(fontSize: 10, color: _mutedText, fontWeight: pw.FontWeight.bold)),
-        pw.SizedBox(height: 4),
-        pw.Container(
-          decoration: pw.BoxDecoration(color: _surface, borderRadius: pw.BorderRadius.circular(6)),
-          padding: const pw.EdgeInsets.all(12),
-          child: pw.Text(obs, style: pw.TextStyle(fontSize: 11, color: _darkText, lineSpacing: 1.6)),
-        ),
-        if (remarks.isNotEmpty) ...[
-          pw.SizedBox(height: 8),
-          pw.Text('Additional Remarks', style: pw.TextStyle(fontSize: 10, color: _mutedText, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 4),
-          pw.Container(
-            decoration: pw.BoxDecoration(color: _surface, borderRadius: pw.BorderRadius.circular(6)),
-            padding: const pw.EdgeInsets.all(12),
-            child: pw.Text(remarks, style: pw.TextStyle(fontSize: 11, color: _darkText, lineSpacing: 1.6)),
-          ),
-        ],
-      ],
+      children: childrenList,
     );
   }
 
   // ────────────────────────────────────────────────────────
   // Doctor Reference Section
   // ────────────────────────────────────────────────────────
-  static pw.Widget _buildDoctorReferenceSection(Map<String, dynamic> data) {
+  static List<pw.Widget> _buildDoctorReferenceSection(Map<String, dynamic> data) {
+    final doctorItems = _infoGrid([
+      _InfoItem('Referring Doctor', data['doctor_name']?.toString() ?? 'As per prescription'),
+      _InfoItem('Doctor ID', data['doctor_id']?.toString() ?? '—'),
+      _InfoItem('Department', data['department']?.toString() ?? 'General Medicine'),
+      _InfoItem('Follow-up Required', data['follow_up']?.toString() ?? 'As advised'),
+    ]);
+
     return _sectionCard(
       title: 'Doctor Reference',
-      icon: '👨‍⚕️',
       color: _primary,
       children: [
-        _infoGrid([
-          _InfoItem('Referring Doctor', data['doctor_name']?.toString() ?? 'As per prescription'),
-          _InfoItem('Doctor ID', data['doctor_id']?.toString() ?? '—'),
-          _InfoItem('Department', data['department']?.toString() ?? 'General Medicine'),
-          _InfoItem('Follow-up Required', data['follow_up']?.toString() ?? 'As advised'),
-        ]),
-        pw.SizedBox(height: 12),
+        ...doctorItems,
+        pw.SizedBox(height: 16),
         pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.end,
           children: [
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
-                pw.Container(width: 120, height: 0.5, color: _darkText),
+                pw.Container(width: 140, height: 0.5, color: _darkText),
                 pw.SizedBox(height: 4),
-                pw.Text('Authorized Signature', style: pw.TextStyle(fontSize: 9, color: _mutedText)),
+                pw.Text('Authorized Signature', style: pw.TextStyle(fontSize: 8.5, color: _mutedText)),
               ],
             ),
           ],
@@ -253,44 +384,53 @@ class PdfService {
   // ────────────────────────────────────────────────────────
   static pw.Widget _buildSecuritySection(Map<String, dynamic> data) {
     final hash = data['sha256_hash']?.toString() ?? '—';
+    final decrypted = data['is_decrypted'] == true;
     return pw.Container(
       decoration: pw.BoxDecoration(
-        color: const PdfColor.fromInt(0xFF1A1A2E),
-        borderRadius: pw.BorderRadius.circular(8),
+        color: const PdfColor.fromInt(0xFFF8FAFC), // slate-50
+        borderRadius: pw.BorderRadius.circular(6),
+        border: pw.Border.all(color: const PdfColor.fromInt(0xFFE2E8F0), width: 0.75), // slate-200
       ),
-      padding: const pw.EdgeInsets.all(14),
+      padding: const pw.EdgeInsets.all(12),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Text(
-            '🔒 SECURITY INFORMATION',
+            '🔒 SECURITY & CRYPTOGRAPHIC INTEGRITY AUDIT',
             style: pw.TextStyle(
-              fontSize: 9,
+              fontSize: 8.5,
               fontWeight: pw.FontWeight.bold,
-              color: PdfColors.teal300,
-              letterSpacing: 1.2,
+              color: const PdfColor.fromInt(0xFF0F172A), // slate-900
+              letterSpacing: 0.8,
             ),
           ),
           pw.SizedBox(height: 8),
           pw.Row(
             children: [
-              _securityBadge('AES-256-GCM Protected'),
-              pw.SizedBox(width: 8),
-              _securityBadge('SHA-256 Verified'),
-              pw.SizedBox(width: 8),
-              _securityBadge('Generated by CareCrypt'),
+              _securityBadge('AES-256-GCM PROTECTED', isPrimary: true),
+              pw.SizedBox(width: 6),
+              if (decrypted) ...[
+                _securityBadge('DECRYPTED SECURELY', isSuccess: true),
+                pw.SizedBox(width: 6),
+              ],
+              _securityBadge('SHA-256 VERIFIED', isPrimary: true),
+              pw.SizedBox(width: 6),
+              _securityBadge('CARECRYPT SIGNED', isPrimary: true),
             ],
           ),
-          pw.SizedBox(height: 8),
+          pw.SizedBox(height: 10),
           pw.Text(
-            'SHA-256: $hash',
-            style: pw.TextStyle(fontSize: 7, color: PdfColors.grey400, fontStyle: pw.FontStyle.italic),
+            'SHA-256 DOCUMENT HASH: $hash',
+            style: pw.TextStyle(fontSize: 7, color: const PdfColor.fromInt(0xFF475569), fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 4),
           pw.Text(
-            'This document was generated by the CareCrypt secure healthcare platform. '
-            'It is encrypted and digitally verified. Any alteration will invalidate the SHA-256 hash.',
-            style: pw.TextStyle(fontSize: 8, color: PdfColors.grey300, lineSpacing: 1.5),
+            decrypted
+                ? 'This document was successfully decrypted from the CareCrypt secure steganographic vault. '
+                  'The payload is client-side AES-256-GCM decrypted and integrity-verified. Any external alteration will invalidate the SHA-256 hash.'
+                : 'This document was generated by the CareCrypt secure healthcare platform. '
+                  'It is fully encrypted and digitally verified. Any alteration will invalidate the SHA-256 hash.',
+            style: pw.TextStyle(fontSize: 7.5, color: const PdfColor.fromInt(0xFF334155), lineSpacing: 1.4),
           ),
         ],
       ),
@@ -301,51 +441,40 @@ class PdfService {
   // Shared layout helpers
   // ────────────────────────────────────────────────────────
 
-  static pw.Widget _sectionCard({
+  static List<pw.Widget> _sectionCard({
     required String title,
-    required String icon,
     required PdfColor color,
     required List<pw.Widget> children,
   }) {
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: _border, width: 0.5),
-        borderRadius: pw.BorderRadius.circular(8),
-      ),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Container(
-            decoration: pw.BoxDecoration(
-              color: color,
-              borderRadius: const pw.BorderRadius.only(
-                topLeft: pw.Radius.circular(8),
-                topRight: pw.Radius.circular(8),
-              ),
-            ),
-            padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: pw.Text(
-              '$icon  $title',
-              style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-              ),
-            ),
+    return [
+      pw.Container(
+        width: double.infinity,
+        decoration: pw.BoxDecoration(
+          border: pw.Border(
+            left: pw.BorderSide(color: color, width: 3.5),
           ),
-          pw.Padding(
-            padding: const pw.EdgeInsets.all(14),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: children,
-            ),
+        ),
+        padding: const pw.EdgeInsets.only(left: 8, top: 2, bottom: 2),
+        child: pw.Text(
+          title.toUpperCase(),
+          style: pw.TextStyle(
+            fontSize: 9.5,
+            fontWeight: pw.FontWeight.bold,
+            color: color,
+            letterSpacing: 1.1,
           ),
-        ],
+        ),
       ),
-    );
+      pw.SizedBox(height: 8),
+      ...children.map((child) => pw.Padding(
+        padding: const pw.EdgeInsets.only(left: 12),
+        child: child,
+      )),
+      pw.SizedBox(height: 14),
+    ];
   }
 
-  static pw.Widget _infoGrid(List<_InfoItem> items) {
+  static List<pw.Widget> _infoGrid(List<_InfoItem> items) {
     final rows = <pw.Widget>[];
     for (int i = 0; i < items.length; i += 2) {
       final left = items[i];
@@ -361,28 +490,37 @@ class PdfService {
       );
       if (i + 2 < items.length) rows.add(pw.SizedBox(height: 6));
     }
-    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: rows);
+    return rows;
   }
 
   static pw.Widget _infoCell(_InfoItem item) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(item.label, style: pw.TextStyle(fontSize: 9, color: _mutedText)),
-        pw.SizedBox(height: 2),
-        pw.Text(item.value, style: pw.TextStyle(fontSize: 11, color: _darkText, fontWeight: pw.FontWeight.bold)),
+        pw.Text(item.label.toUpperCase(), style: pw.TextStyle(fontSize: 7.5, color: _mutedText, letterSpacing: 0.5)),
+        pw.SizedBox(height: 1.5),
+        pw.Text(item.value, style: pw.TextStyle(fontSize: 9.5, color: _darkText, fontWeight: pw.FontWeight.bold)),
       ],
     );
   }
 
-  static pw.Widget _securityBadge(String label) {
+  static pw.Widget _securityBadge(String label, {bool isPrimary = false, bool isSuccess = false}) {
+    final bgColor = isSuccess 
+        ? const PdfColor.fromInt(0xFFDCFCE7) // emerald-100
+        : const PdfColor.fromInt(0xFFDBEAFE); // blue-100
+    final textColor = isSuccess 
+        ? const PdfColor.fromInt(0xFF15803D) // emerald-700
+        : const PdfColor.fromInt(0xFF1D4ED8); // blue-700
     return pw.Container(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       decoration: pw.BoxDecoration(
-        color: PdfColors.teal800,
-        borderRadius: pw.BorderRadius.circular(100),
+        color: bgColor,
+        borderRadius: pw.BorderRadius.circular(3),
       ),
-      child: pw.Text(label, style: pw.TextStyle(fontSize: 8, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+      child: pw.Text(
+        label,
+        style: pw.TextStyle(fontSize: 7, color: textColor, fontWeight: pw.FontWeight.bold),
+      ),
     );
   }
 

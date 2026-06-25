@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:printing/printing.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../features/auth/bloc/auth_bloc.dart';
 import '../bloc/doctor_bloc.dart';
+import '../../lab/bloc/lab_bloc.dart';
 
 class DoctorPatientAccessScreen extends StatefulWidget {
   final String patientId;
@@ -50,30 +53,42 @@ class _DoctorPatientAccessScreenState extends State<DoctorPatientAccessScreen> {
           ),
         ],
       ),
-      body: BlocBuilder<DoctorBloc, DoctorState>(
-        builder: (context, state) {
-          if (state is DoctorLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
-          if (state is DoctorError) return Center(child: Text(state.message, style: AppTextStyles.bodyMd.copyWith(color: AppTheme.error)));
-          if (state is! DoctorPatientLoaded) return const SizedBox.shrink();
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPatientHeader(state.patient),
-                const SizedBox(height: 20),
-                _buildActionButtons(state),
-                const SizedBox(height: 20),
-                _buildSection('Active Diagnoses', _buildDiagnosisList(state.diagnoses)),
-                const SizedBox(height: 16),
-                _buildSection('Prescriptions', _buildPrescriptionList(state.prescriptions)),
-                const SizedBox(height: 16),
-                _buildSection('Lab Reports', _buildLabList(state.labReports)),
-              ],
-            ),
-          );
+      body: BlocListener<LabBloc, LabState>(
+        listener: (context, labState) {
+          if (labState is LabReportReady) {
+            Printing.layoutPdf(onLayout: (_) async => labState.pdfBytes);
+          }
+          if (labState is LabError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(labState.message), backgroundColor: AppTheme.error),
+            );
+          }
         },
+        child: BlocBuilder<DoctorBloc, DoctorState>(
+          builder: (context, state) {
+            if (state is DoctorLoading) return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+            if (state is DoctorError) return Center(child: Text(state.message, style: AppTextStyles.bodyMd.copyWith(color: AppTheme.error)));
+            if (state is! DoctorPatientLoaded) return const SizedBox.shrink();
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPatientHeader(state.patient),
+                  const SizedBox(height: 20),
+                  _buildActionButtons(state),
+                  const SizedBox(height: 20),
+                  _buildSection('Active Diagnoses', _buildDiagnosisList(state.diagnoses)),
+                  const SizedBox(height: 16),
+                  _buildSection('Prescriptions', _buildPrescriptionList(state.prescriptions)),
+                  const SizedBox(height: 16),
+                  _buildSection('Lab Reports', _buildLabList(state.labReports)),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -211,24 +226,36 @@ class _DoctorPatientAccessScreenState extends State<DoctorPatientAccessScreen> {
     return Column(
       children: reports.map((r) => Container(
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppTheme.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.science_outlined, color: AppTheme.tertiary, size: 18),
-            const SizedBox(width: 10),
-            Expanded(child: Text('Lab Report ${r['id']?.toString().substring(0, 8)}...', style: AppTextStyles.titleMd.copyWith(color: AppTheme.onSurface))),
-            if (r['sha256_hash'] != null)
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.verified_outlined, size: 14, color: AppTheme.secondary),
-                const SizedBox(width: 4),
-                Text('Verified', style: AppTextStyles.codeSm.copyWith(color: AppTheme.secondary)),
-              ]),
-          ],
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          leading: const Icon(Icons.science_outlined, color: AppTheme.tertiary, size: 18),
+          title: Text(
+            '${r['report_metadata'] != null ? (jsonDecode(r['report_metadata'])['test_type'] ?? 'Lab Report') : 'Lab Report'}',
+            style: AppTextStyles.titleMd.copyWith(color: AppTheme.onSurface),
+          ),
+          subtitle: Text('Tap to Decrypt & View PDF', style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline)),
+          trailing: r['sha256_hash'] != null
+              ? Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.verified_outlined, size: 14, color: AppTheme.secondary),
+                  const SizedBox(width: 4),
+                  Text('Verified', style: AppTextStyles.codeSm.copyWith(color: AppTheme.secondary)),
+                ])
+              : const SizedBox.shrink(),
+          onTap: () {
+            context.read<LabBloc>().add(LabDownloadReport(
+              requestId: r['request_id'] as String? ?? '',
+              patientId: widget.patientId,
+              keyAlias: r['key_alias'] as String? ?? 'lab_key_${r['request_id']}',
+            ));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Downloading & Decrypting Lab Report PDF...')),
+            );
+          },
         ),
       )).toList(),
     );

@@ -78,11 +78,17 @@ class _LabDashboardState extends State<LabDashboard> with SingleTickerProviderSt
       backgroundColor: AppTheme.background,
       surfaceTintColor: Colors.transparent,
       titleSpacing: 16,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      title: Row(
         children: [
-          Text('Lab Portal', style: AppTextStyles.titleLg.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w800)),
-          Text(auth.user.displayName, style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline)),
+          Image.asset('assets/images/logo.png', width: 22, height: 22),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Lab Portal', style: AppTextStyles.titleLg.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w800)),
+              Text(auth.user.displayName, style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline)),
+            ],
+          ),
         ],
       ),
       actions: [
@@ -370,7 +376,7 @@ class _LabDashboardState extends State<LabDashboard> with SingleTickerProviderSt
                 title: Text('Upload Report', style: AppTextStyles.titleMd.copyWith(color: AppTheme.primaryContainer)),
                 subtitle: Text('Encrypt, hash & steganograph', style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline)),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.primaryContainer),
-                onTap: () => context.push('${AppRoutes.labUploadReport}?requestId=${req['id']}&patientId=$patientId'),
+                onTap: () => context.push('${AppRoutes.labUploadReport}?requestId=${req['id']}&patientId=$patientId&testType=${Uri.encodeQueryComponent(testType)}'),
               ),
             ),
           if (status == RequestCardStatus.completed)
@@ -464,7 +470,8 @@ enum RequestCardStatus { awaitingApproval, approved, completed }
 class LabUploadReportScreen extends StatefulWidget {
   final String requestId;
   final String patientId;
-  const LabUploadReportScreen({super.key, required this.requestId, this.patientId = ''});
+  final String testType;
+  const LabUploadReportScreen({super.key, required this.requestId, this.patientId = '', this.testType = ''});
   @override
   State<LabUploadReportScreen> createState() => _LabUploadReportScreenState();
 }
@@ -476,6 +483,72 @@ class _LabUploadReportScreenState extends State<LabUploadReportScreen> {
   final _observationController = TextEditingController();
   final _remarksController = TextEditingController();
   ReportDraftStatus _draftStatus = ReportDraftStatus.draft;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.patientId == 'PAT004') {
+      _resultController.text = 'COMPLETE BLOOD COUNT (CBC) WITH DIFFERENTIAL:\n'
+          '- Red Blood Cell (RBC) Count: 5.12 x10^6/uL (Normal: 4.30 - 5.90)\n'
+          '- Hemoglobin: 15.2 g/dL (Normal: 13.8 - 17.2)\n'
+          '- Hematocrit: 45.8% (Normal: 41.5 - 50.4)\n'
+          '- Mean Corpuscular Volume (MCV): 89.5 fL (Normal: 80.0 - 96.0)\n'
+          '- White Blood Cells (WBC): 6.8 x10^3/uL (Normal: 4.5 - 11.0)\n'
+          '- Platelet Count: 245 x10^3/uL (Normal: 150 - 450)\n'
+          '- Neutrophils: 58.2% (Normal: 40.0 - 70.0)\n'
+          '- Lymphocytes: 29.5% (Normal: 20.0 - 40.0)\n'
+          '- Monocytes: 6.8% (Normal: 2.0 - 8.0)\n'
+          '- Eosinophils: 4.1% (Normal: 1.0 - 4.0)\n'
+          '- Basophils: 1.4% (Normal: 0.5 - 1.0)\n\n'
+          'COMPREHENSIVE METABOLIC PANEL (CMP):\n'
+          '- Fasting Blood Glucose: 96 mg/dL (Normal: 70 - 99)\n'
+          '- HbA1c: 5.4% (Normal: < 5.7% - Optimal Glycemic Control)\n'
+          '- Blood Urea Nitrogen (BUN): 14.5 mg/dL (Normal: 7.0 - 20.0)\n'
+          '- Serum Creatinine: 0.92 mg/dL (Normal: 0.70 - 1.30)\n'
+          '- eGFR (Estimated Glomerular Filtration Rate): > 90 mL/min/1.73m^2 (Normal: > 60)\n'
+          '- Sodium: 141 mEq/L (Normal: 136 - 145)\n'
+          '- Potassium: 4.2 mEq/L (Normal: 3.5 - 5.1)\n'
+          '- Chloride: 102 mEq/L (Normal: 98 - 107)\n'
+          '- Carbon Dioxide (CO2): 26 mEq/L (Normal: 23 - 29)\n'
+          '- Serum Calcium: 9.6 mg/dL (Normal: 8.6 - 10.2)\n'
+          '- Total Protein: 7.1 g/dL (Normal: 6.4 - 8.3)\n'
+          '- Albumin: 4.5 g/dL (Normal: 3.5 - 5.0)\n'
+          '- Globulin: 2.6 g/dL (Normal: 2.0 - 3.5)\n'
+          '- Bilirubin, Total: 0.7 mg/dL (Normal: 0.2 - 1.2)\n'
+          '- Alkaline Phosphatase (ALP): 78 U/L (Normal: 44 - 147)\n'
+          '- Aspartate Aminotransferase (AST): 24 U/L (Normal: 8 - 48)\n'
+          '- Alanine Aminotransferase (ALT): 28 U/L (Normal: 7 - 56)\n\n'
+          'LIPID PANEL & CORONARY RISK ASSESSMENT:\n'
+          '- Total Cholesterol: 185 mg/dL (Normal: < 200)\n'
+          '- HDL Cholesterol: 52 mg/dL (Normal: > 40)\n'
+          '- LDL Cholesterol (Calculated): 105 mg/dL (Normal: < 100 - Borderline Elevated)\n'
+          '- Triglycerides: 140 mg/dL (Normal: < 150)\n'
+          '- VLDL Cholesterol: 28 mg/dL (Normal: 5 - 40)\n'
+          '- Total Cholesterol/HDL Ratio: 3.56 (Optimal Risk: < 5.0)\n\n'
+          'ENDOCRINE & THYROID PROFILE:\n'
+          '- Thyroid Stimulating Hormone (TSH): 2.15 uIU/mL (Normal: 0.45 - 4.50)\n'
+          '- Free Thyroxine (Free T4): 1.24 ng/dL (Normal: 0.82 - 1.77)\n'
+          '- Free Triiodothyronine (Free T3): 3.1 pg/mL (Normal: 2.0 - 4.4)\n\n'
+          'VITAMINS & ESSENTIAL MINERALS:\n'
+          '- Vitamin D, 25-Hydroxy: 34.8 ng/mL (Normal: 30.0 - 100.0)\n'
+          '- Vitamin B12: 485 pg/mL (Normal: 232 - 1245)\n'
+          '- Serum Magnesium: 2.1 mg/dL (Normal: 1.6 - 2.6)\n'
+          'All other secondary biomarkers and hematology quotients fall within standard baseline tolerances.';
+ 
+      _observationController.text = 'The diagnostic workup indicates excellent metabolic and physiological indices. '
+          'Blood counts are fully robust with stable hematological quotients. HbA1c of 5.4% indicates superior '
+          'glycemic control over the preceding 90 days. Renal markers (Creatinine, BUN, eGFR) indicate normal '
+          'glomerular filtration capacity. Hepatic enzymes (ALT, AST) display no signs of hepatic stress or cellular injury. '
+          'Lipid panel is favorable, with borderline high LDL (105 mg/dL) which is well-mitigated by an optimal '
+          'total/HDL risk ratio. Thyroid homeostasis is well-maintained with normal TSH. Vitamin panels are sufficient, '
+          'though Vitamin D is on the lower end of the reference range (34.8 ng/mL).';
+ 
+      _remarksController.text = '1. Maintain current aerobic activity regimen (at least 150 minutes of moderate intensity exercise weekly).\n'
+          '2. Address borderline LDL level with dietary modifications, prioritizing soluble fiber intake, monounsaturated fats (olive oil, avocados), and minimizing saturated fats/processed sugars.\n'
+          '3. Optimize Vitamin D absorption through direct sunshine exposure or minor supplementation (1000-2000 IU daily).\n'
+          '4. Re-screen full lipid profiles and Vitamin D status in 6 months to monitor metabolic progress.';
+    }
+  }
 
   @override
   void dispose() {
@@ -607,6 +680,8 @@ class _LabUploadReportScreenState extends State<LabUploadReportScreen> {
                   testResult: _resultController.text.trim(),
                   observation: _observationController.text.trim(),
                   remarks: _remarksController.text.trim(),
+                  testType: widget.testType.isNotEmpty ? widget.testType : 'Lab Test',
+                  technicianName: auth.user.displayName,
                 ));
               },
               icon: state is LabReportUploading

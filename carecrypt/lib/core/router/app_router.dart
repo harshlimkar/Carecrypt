@@ -59,7 +59,7 @@ class AppRouter {
 
       // ── Lab ─────────────────────────────────────
       GoRoute(path: AppRoutes.labDashboard, builder: (_, __) => const LabDashboard()),
-      GoRoute(path: AppRoutes.labUploadReport, builder: (_, s) => LabUploadReportScreen(requestId: s.uri.queryParameters['requestId'] ?? '', patientId: s.uri.queryParameters['patientId'] ?? '')),
+      GoRoute(path: AppRoutes.labUploadReport, builder: (_, s) => LabUploadReportScreen(requestId: s.uri.queryParameters['requestId'] ?? '', patientId: s.uri.queryParameters['patientId'] ?? '', testType: s.uri.queryParameters['testType'] ?? '')),
 
       // ── Pharmacy ────────────────────────────────
       GoRoute(path: AppRoutes.pharmacyScanner, builder: (_, __) => const PharmacyScannerScreen()),

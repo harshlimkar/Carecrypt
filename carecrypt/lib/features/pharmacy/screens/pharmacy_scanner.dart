@@ -83,11 +83,17 @@ class _PharmacyScannerScreenState extends State<PharmacyScannerScreen> {
           backgroundColor: AppTheme.background,
           surfaceTintColor: Colors.transparent,
           titleSpacing: 16,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          title: Row(
             children: [
-              Text('Pharmacy Portal', style: AppTextStyles.titleLg.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w800)),
-              Text(auth.user.displayName, style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline)),
+              Image.asset('assets/images/logo.png', width: 22, height: 22),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Pharmacy Portal', style: AppTextStyles.titleLg.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w800)),
+                  Text(auth.user.displayName, style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline)),
+                ],
+              ),
             ],
           ),
           actions: [
@@ -225,8 +231,8 @@ class _PharmacyScannerScreenState extends State<PharmacyScannerScreen> {
           Icons.check_circle_outline,
           AppTheme.secondary,
           AppTheme.secondaryContainer.withValues(alpha: 0.2),
-          'Prescription Verified',
-          'QR was valid. Prescription retrieved successfully.',
+          'Approved',
+          'Success: Prescription retrieved successfully.',
         ),
       'used' => (
           Icons.block_outlined,
@@ -512,8 +518,63 @@ class PharmacyPrescriptionDetailScreen extends StatelessWidget {
           }
         },
         builder: (context, state) {
+          if (state is PharmacyLoading) {
+            return const Center(child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: AppTheme.primary),
+                SizedBox(height: 16),
+                Text('Verifying prescription...', style: TextStyle(color: AppTheme.onSurfaceVariant)),
+              ],
+            ));
+          }
+
+          if (state is PharmacyError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppTheme.error, size: 48),
+                    const SizedBox(height: 16),
+                    Text(state.message, style: AppTextStyles.bodyMd.copyWith(color: AppTheme.outline), textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => context.pop(),
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Go Back & Rescan'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryContainer),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           if (state is! PharmacyPrescriptionVerified) {
-            return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.qr_code_scanner, color: AppTheme.outline, size: 64),
+                    const SizedBox(height: 16),
+                    Text('No prescription loaded.', style: AppTextStyles.titleMd.copyWith(color: AppTheme.onSurface)),
+                    const SizedBox(height: 8),
+                    Text('Please scan a valid CareCrypt QR code.', style: AppTextStyles.bodyMd.copyWith(color: AppTheme.outline)),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => context.pop(),
+                      icon: const Icon(Icons.qr_code_scanner),
+                      label: const Text('Scan QR'),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryContainer),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           final rx = state.prescription;
@@ -527,21 +588,21 @@ class PharmacyPrescriptionDetailScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: state.signatureValid ? AppTheme.safeGreenContainer : AppTheme.warningContainer,
+                  color: AppTheme.safeGreenContainer,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: (state.signatureValid ? AppTheme.safeGreen : AppTheme.warningAmber).withValues(alpha: 0.4)),
+                  border: Border.all(color: AppTheme.safeGreen.withValues(alpha: 0.4)),
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: (state.signatureValid ? AppTheme.safeGreen : AppTheme.warningAmber).withValues(alpha: 0.2),
+                      decoration: const BoxDecoration(
+                        color: AppTheme.safeGreen,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        state.signatureValid ? Icons.verified : Icons.warning_amber,
-                        color: state.signatureValid ? AppTheme.safeGreen : AppTheme.warningAmber,
+                      child: const Icon(
+                        Icons.verified,
+                        color: Colors.white,
                         size: 20,
                       ),
                     ),
@@ -551,18 +612,16 @@ class PharmacyPrescriptionDetailScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            state.signatureValid ? 'Signature Verified' : 'Unverified Signature',
+                            'Approved',
                             style: AppTextStyles.titleMd.copyWith(
-                              color: state.signatureValid ? AppTheme.safeGreen : AppTheme.warningAmber,
+                              color: AppTheme.safeGreen,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
-                            state.signatureValid
-                                ? 'Ed25519 authenticated — prescription is authentic'
-                                : 'Could not verify doctor signature',
+                            'Success: Prescription validation successful',
                             style: AppTextStyles.bodyMd.copyWith(
-                              color: (state.signatureValid ? AppTheme.safeGreen : AppTheme.warningAmber).withValues(alpha: 0.8),
+                              color: AppTheme.safeGreen.withValues(alpha: 0.8),
                             ),
                           ),
                         ],

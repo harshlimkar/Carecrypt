@@ -163,7 +163,7 @@ class DoctorBloc extends Bloc<DoctorEvent, DoctorState> {
 
   Future<void> _onCreateLabRequest(DoctorCreateLabRequest event, Emitter<DoctorState> emit) async {
     try {
-      await _supabase.from('lab_requests').insert({
+      final insertedRow = await _supabase.from('lab_requests').insert({
         'patient_id': event.patientId,
         'doctor_id': event.doctorId,
         'test_type': event.testType,
@@ -171,13 +171,21 @@ class DoctorBloc extends Bloc<DoctorEvent, DoctorState> {
         'urgency': event.urgency,
         'status': 'pending',
         'created_at': DateTime.now().toIso8601String(),
-      });
+      }).select('id').single();
+
+      final insertedId = insertedRow['id'] as String;
+
       // Notify patient
       await _supabase.rpc('notify_user_by_patient_id', params: {
         'p_patient_id': event.patientId,
         'p_type': 'lab_request',
         'p_message': 'Dr. requested a lab test: ${event.testType}. Please approve or reject.',
-        'p_metadata': {'test_type': event.testType, 'doctor_id': event.doctorId},
+        'p_metadata': {
+          'test_type': event.testType,
+          'doctor_id': event.doctorId,
+          'request_id': insertedId,
+          'patient_id': event.patientId,
+        },
       });
       emit(const DoctorActionSuccess(message: 'Lab request created. Patient notified.'));
     } catch (e) {

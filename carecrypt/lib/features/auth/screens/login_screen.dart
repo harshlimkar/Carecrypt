@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/biometric_service.dart';
+import '../../../core/services/crypto_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -21,6 +23,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   String _selectedRole = AppRoles.patient;
   bool _obscurePassword = true;
   bool _biometricAvailable = false;
+  bool _hasSavedCredentials = false;
+  String _savedEmail = '';
+  String _savedRole = '';
   late AnimationController _shimmerController;
 
   final List<Map<String, dynamic>> _roles = [
@@ -38,14 +43,31 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    // shimmerAnimation available as local if needed via _shimmerController.value
     _checkBiometrics();
+    _loadSavedCredentials();
     context.read<AuthBloc>().add(AuthCheckSession());
   }
 
   Future<void> _checkBiometrics() async {
     final available = await BiometricService.isAvailable();
     if (mounted) setState(() => _biometricAvailable = available);
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedEmail = prefs.getString('cc_last_email') ?? '';
+      final savedRole = prefs.getString('cc_last_role') ?? '';
+      if (savedEmail.isNotEmpty && mounted) {
+        setState(() {
+          _hasSavedCredentials = true;
+          _savedEmail = savedEmail;
+          _savedRole = savedRole;
+          _emailController.text = savedEmail;
+          if (savedRole.isNotEmpty) _selectedRole = savedRole;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -59,16 +81,27 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (state is AuthAuthenticated) {
-          context.go(state.user.dashboardRoute);
+          // Save credentials for future biometric login
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('cc_last_email', state.user.email);
+            await prefs.setString('cc_last_role', state.user.role);
+            if (_passwordController.text.isNotEmpty) {
+              await CryptoService.storeKey('cc_secure_pass_${state.user.email}', _passwordController.text);
+            }
+          } catch (_) {}
+          if (context.mounted) context.go(state.user.dashboardRoute);
         } else if (state is AuthError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppTheme.error,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.error,
+              ),
+            );
+          }
         }
       },
       child: Scaffold(
@@ -219,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: AppTheme.primaryContainer,
+                color: Colors.white,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
@@ -229,7 +262,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   ),
                 ],
               ),
-              child: const Icon(Icons.security_rounded, color: AppTheme.onPrimary, size: 36),
+              child: ClipOval(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -240,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         ),
         const SizedBox(height: 8),
         Text(
-          'Welcome to CareCrypt. Secure. Private. Yours.',
+          'Secure Healthcare Platform — Your Data, Your Control.',
           style: AppTextStyles.bodyMd.copyWith(
             color: AppTheme.onSurfaceVariant,
           ),
@@ -324,7 +365,52 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 Expanded(child: Divider(color: AppTheme.outlineVariant.withValues(alpha: 0.5))),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Biometric hint
+            if (_hasSavedCredentials)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondaryContainer.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.secondary.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.fingerprint, size: 16, color: AppTheme.secondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Biometric login available for $_savedEmail',
+                        style: AppTextStyles.labelMd.copyWith(color: AppTheme.secondary),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: AppTheme.outline),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Login once with password to enable biometric access',
+                        style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // Biometric buttons
             _buildBiometricButtons(),
@@ -385,7 +471,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       keyboardType: TextInputType.emailAddress,
       style: AppTextStyles.bodyMd.copyWith(color: AppTheme.onSurface),
       decoration: InputDecoration(
-        hintText: 'name@medical-center.org',
+        hintText: 'harshlimkar23@gmail.com',
         prefixIcon: const Icon(Icons.alternate_email, size: 20, color: AppTheme.outline),
       ),
       validator: (v) {
@@ -474,7 +560,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           child: _BiometricButton(
             icon: Icons.fingerprint,
             label: 'Touch ID',
-            onTap: _biometricAvailable ? _onBiometricTap : null,
+            enabled: _biometricAvailable,
+            onTap: _biometricAvailable
+                ? (_hasSavedCredentials ? _onBiometricTap : _showBiometricNotAvailable)
+                : null,
           ),
         ),
         const SizedBox(width: 16),
@@ -482,10 +571,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           child: _BiometricButton(
             icon: Icons.face_retouching_natural,
             label: 'Face ID',
-            onTap: _biometricAvailable ? _onBiometricTap : null,
+            enabled: _biometricAvailable,
+            onTap: _biometricAvailable
+                ? (_hasSavedCredentials ? _onBiometricTap : _showBiometricNotAvailable)
+                : null,
           ),
         ),
       ],
+    );
+  }
+
+  void _showBiometricNotAvailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please log in once with your password to enable biometric login.'),
+        backgroundColor: AppTheme.warningAmber,
+        duration: Duration(seconds: 3),
+      ),
     );
   }
 
@@ -584,7 +686,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 
   void _onBiometricTap() {
-    context.read<AuthBloc>().add(AuthBiometricRequested(role: _selectedRole));
+    context.read<AuthBloc>().add(AuthBiometricRequested(
+      role: _savedRole.isNotEmpty ? _savedRole : _selectedRole,
+    ));
   }
 }
 
@@ -592,11 +696,13 @@ class _BiometricButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final bool enabled;
 
   const _BiometricButton({
     required this.icon,
     required this.label,
     this.onTap,
+    this.enabled = false,
   });
 
   @override
@@ -608,25 +714,32 @@ class _BiometricButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           border: Border.all(
-            color: onTap != null ? AppTheme.outlineVariant : AppTheme.outlineVariant.withValues(alpha: 0.4),
+            color: enabled ? AppTheme.secondary.withValues(alpha: 0.5) : AppTheme.outlineVariant.withValues(alpha: 0.4),
           ),
           borderRadius: BorderRadius.circular(16),
-          color: onTap != null ? null : AppTheme.surfaceContainerLow,
+          color: enabled ? AppTheme.secondaryContainer.withValues(alpha: 0.1) : AppTheme.surfaceContainerLow,
         ),
         child: Column(
           children: [
             Icon(
               icon,
               size: 32,
-              color: onTap != null ? AppTheme.primary : AppTheme.outline.withValues(alpha: 0.5),
+              color: enabled ? AppTheme.secondary : AppTheme.outline.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 8),
             Text(
               label,
               style: AppTextStyles.labelMd.copyWith(
-                color: AppTheme.onSurfaceVariant,
+                color: enabled ? AppTheme.secondary : AppTheme.onSurfaceVariant,
               ),
             ),
+            if (enabled) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Ready',
+                style: AppTextStyles.codeSm.copyWith(color: AppTheme.secondary, fontSize: 9),
+              ),
+            ],
           ],
         ),
       ),

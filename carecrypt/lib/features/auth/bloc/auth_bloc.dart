@@ -1,8 +1,11 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/biometric_service.dart';
+import '../../../core/services/crypto_service.dart';
 import '../models/user_model.dart';
 
 // ─── Events ───────────────────────────────────────────────
@@ -121,20 +124,73 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onBiometric(AuthBiometricRequested event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
-      // Check if there's an existing session
-      final session = _supabase.auth.currentSession;
-      if (session == null) {
-        emit(const AuthError(message: 'Please log in first to enable biometrics'));
+      // Step 1: Authenticate biometrically
+      final bioResult = await BiometricService.authenticateRich(
+        reason: 'Verify your identity to access CareCrypt',
+      );
+
+      // needsSimulation = no hardware, treat as success for demo
+      if (bioResult == BiometricResult.failed) {
+        emit(const AuthError(message: 'Biometric authentication was cancelled or failed'));
         return;
       }
-      final user = await _fetchUser(session.user.id);
-      if (user != null) {
-        emit(AuthAuthenticated(user: user));
-      } else {
-        emit(const AuthError(message: 'Biometric login failed'));
+
+      // Step 2: Check for an existing Supabase session
+      final session = _supabase.auth.currentSession;
+      if (session != null) {
+        final user = await _fetchUser(session.user.id);
+        if (user != null) {
+          await NotificationService.instance.subscribeToUserNotifications(user.id);
+          emit(AuthAuthenticated(user: user));
+          return;
+        }
       }
-    } catch (_) {
-      emit(const AuthError(message: 'Biometric authentication failed'));
+
+      // Step 3: Try to refresh the session (token may have expired)
+      try {
+        final refreshed = await _supabase.auth.refreshSession();
+        if (refreshed.user != null) {
+          final user = await _fetchUser(refreshed.user!.id);
+          if (user != null) {
+            await NotificationService.instance.subscribeToUserNotifications(user.id);
+            emit(AuthAuthenticated(user: user));
+            return;
+          }
+        }
+      } catch (_) {
+        // Session refresh failed
+      }
+
+      // Step 4: No active session - Attempt to login using credentials stored in secure storage
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedEmail = prefs.getString('cc_last_email') ?? '';
+        final savedRole = prefs.getString('cc_last_role') ?? '';
+        if (savedEmail.isNotEmpty) {
+          final password = await CryptoService.loadKey('cc_secure_pass_$savedEmail');
+          if (password != null && password.isNotEmpty) {
+            final response = await _supabase.auth.signInWithPassword(
+              email: savedEmail,
+              password: password,
+            );
+            if (response.user != null) {
+              final user = await _fetchUser(response.user!.id);
+              if (user != null && user.role == savedRole) {
+                await NotificationService.instance.subscribeToUserNotifications(user.id);
+                emit(AuthAuthenticated(user: user));
+                return;
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // Stored auth failed
+      }
+
+      // Step 5: No valid session and credentials failed — inform user
+      emit(const AuthError(message: 'Session expired. Please log in once with your password to re-enable biometrics.'));
+    } catch (e) {
+      emit(AuthError(message: 'Biometric authentication failed: ${e.toString()}'));
     }
   }
 

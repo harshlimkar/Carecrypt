@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
@@ -6,6 +8,8 @@ import 'package:shimmer/shimmer.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/services/ai_service.dart';
+import '../../../core/services/nfc_service.dart';
+import '../../../core/services/crypto_service.dart';
 import '../../../features/auth/bloc/auth_bloc.dart';
 import '../bloc/patient_bloc.dart';
 import '../../../shared/widgets/cc_bottom_nav.dart';
@@ -169,6 +173,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
             ),
           ),
           const SizedBox(width: 10),
+          Image.asset('assets/images/logo.png', width: 22, height: 22),
+          const SizedBox(width: 6),
           Text('CareCrypt', style: AppTextStyles.titleLg.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
         ],
       ),
@@ -441,7 +447,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
       {'icon': Icons.science_outlined, 'label': 'Lab Reports', 'route': AppRoutes.patientRecords, 'primary': false},
       {'icon': Icons.medication_outlined, 'label': 'Prescriptions', 'route': AppRoutes.patientRecords, 'primary': false},
       {'icon': Icons.notifications_outlined, 'label': 'Notifications', 'route': AppRoutes.patientNotifications, 'primary': false},
-      {'icon': Icons.folder_open_outlined, 'label': 'My Records', 'route': AppRoutes.patientRecords, 'primary': false},
+      {'icon': Icons.nfc_outlined, 'label': 'NFC Card Setup', 'route': 'nfc_setup', 'primary': false},
+      {'icon': Icons.calendar_month_outlined, 'label': 'Book Appointment', 'route': 'book_appointment', 'primary': false},
       {'icon': Icons.shield_outlined, 'label': 'Access Log', 'route': AppRoutes.patientAccessLog, 'primary': false},
     ];
 
@@ -464,7 +471,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
             final action = actions[i];
             final isPrimary = action['primary'] as bool;
             return GestureDetector(
-              onTap: () => context.push(action['route'] as String),
+              onTap: () {
+                if (action['route'] == 'nfc_setup') {
+                  final auth = context.read<AuthBloc>().state as AuthAuthenticated;
+                  _showNfcSetupDialog(auth);
+                } else if (action['route'] == 'book_appointment') {
+                  _showBookAppointmentDialog();
+                } else {
+                  context.push(action['route'] as String);
+                }
+              },
               child: Container(
                 decoration: BoxDecoration(
                   color: isPrimary ? AppTheme.primaryContainer : AppTheme.surfaceContainerLowest,
@@ -504,6 +520,352 @@ class _PatientDashboardState extends State<PatientDashboard> {
           },
         ),
       ],
+    );
+  }
+
+  void _showBookAppointmentDialog() {
+    String selectedDoctor = 'Dr. Sarah Smith (Cardiologist)';
+    String selectedDate = 'Tomorrow, June 22';
+    String selectedTimeSlot = '10:00 AM';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 32)],
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(color: AppTheme.outlineVariant, borderRadius: BorderRadius.circular(100)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryFixed.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.calendar_month_outlined, color: AppTheme.primary, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Book Appointment',
+                                style: AppTextStyles.titleLg.copyWith(color: AppTheme.onSurface, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                'Schedule a visit with your physician',
+                                style: AppTextStyles.labelMd.copyWith(color: AppTheme.outline),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Select Doctor',
+                      style: AppTextStyles.titleMd.copyWith(color: AppTheme.onSurface, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedDoctor,
+                          isExpanded: true,
+                          dropdownColor: AppTheme.surfaceContainerLowest,
+                          items: <String>[
+                            'Dr. Sarah Smith (Cardiologist)',
+                            'Dr. James Lee (Endocrinologist)',
+                            'Dr. Rita Nair (General Physician)',
+                          ].map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value, style: AppTextStyles.bodyMd.copyWith(color: AppTheme.onSurface)),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setModalState(() => selectedDoctor = val);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Select Date',
+                      style: AppTextStyles.titleMd.copyWith(color: AppTheme.onSurface, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: <String>[
+                          'Today, June 21',
+                          'Tomorrow, June 22',
+                          'Tuesday, June 23',
+                          'Wednesday, June 24',
+                        ].map((date) {
+                          final isSelected = selectedDate == date;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(date),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setModalState(() => selectedDate = date);
+                                }
+                              },
+                              selectedColor: AppTheme.primaryContainer,
+                              labelStyle: AppTextStyles.bodyMd.copyWith(
+                                color: isSelected ? AppTheme.onPrimary : AppTheme.onSurface,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Available Slots',
+                      style: AppTextStyles.titleMd.copyWith(color: AppTheme.onSurface, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <String>[
+                        '09:00 AM',
+                        '10:00 AM',
+                        '11:30 AM',
+                        '02:00 PM',
+                        '03:30 PM',
+                        '04:30 PM',
+                      ].map((slot) {
+                        final isSelected = selectedTimeSlot == slot;
+                        return ChoiceChip(
+                          label: Text(slot),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setModalState(() => selectedTimeSlot = slot);
+                            }
+                          },
+                          selectedColor: AppTheme.primaryContainer,
+                          labelStyle: AppTextStyles.bodyMd.copyWith(
+                            color: isSelected ? AppTheme.onPrimary : AppTheme.onSurface,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Your appointment has been booked'),
+                            backgroundColor: AppTheme.secondary,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        minimumSize: const Size(double.infinity, 52),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: Text(
+                        'Confirm Appointment',
+                        style: AppTextStyles.titleMd.copyWith(color: AppTheme.onPrimary, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showNfcSetupDialog(AuthAuthenticated authState) async {
+    final mockKeys = await CryptoService.generateX25519KeyPair();
+    final patientPublicKey = mockKeys['publicKey']!;
+    
+    final payloadMap = {
+      'patientId': authState.user.patientId ?? 'PAT004',
+      'publicKey': patientPublicKey,
+      'app': 'CareCrypt',
+      'version': '2.0',
+    };
+    final jsonStr = jsonEncode(payloadMap);
+
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 32)],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.outlineVariant, borderRadius: BorderRadius.circular(100))),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryFixed.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.nfc_rounded, color: AppTheme.primary, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('NFC Card Setup', style: AppTextStyles.titleLg.copyWith(color: AppTheme.onSurface)),
+                          Text('Program or copy your NFC tag payload', style: AppTextStyles.bodyMd.copyWith(color: AppTheme.outline)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Write this JSON payload to your physical NFC tag as a Text record. Doctors and nurses can tap your card to scan your patient ID.',
+                  style: AppTextStyles.bodyMd.copyWith(color: AppTheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  height: 120,
+                  width: double.infinity,
+                  child: SingleChildScrollView(
+                    child: SelectionArea(
+                      child: Text(
+                        jsonStr,
+                        style: AppTextStyles.codeSm.copyWith(color: AppTheme.onSurfaceVariant, fontSize: 11),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: jsonStr));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('JSON copied to clipboard'), backgroundColor: AppTheme.secondary),
+                          );
+                        },
+                        icon: const Icon(Icons.copy),
+                        label: const Text('Copy JSON'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Approach your physical NFC tag to write data...'), duration: Duration(seconds: 4)),
+                          );
+                          final success = await NfcService.writePatientTag(
+                            patientId: authState.user.patientId ?? 'PAT004',
+                            publicKeyBase64: patientPublicKey,
+                          );
+                          if (!mounted) return;
+                          if (success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Successfully programmed NFC tag!'), backgroundColor: AppTheme.safeGreen),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Failed to program tag. Ensure NFC is enabled and writable.'), backgroundColor: AppTheme.error),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.nfc),
+                        label: const Text('Write Tag'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryContainer,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

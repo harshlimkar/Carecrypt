@@ -61,6 +61,7 @@ dependencies:
   # PDF Generation & Viewer
   pdf: ^3.11.0
   printing: ^5.13.0
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +73,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/images/logo.png
     - assets/images/
     - assets/icons/
     - assets/lottie/

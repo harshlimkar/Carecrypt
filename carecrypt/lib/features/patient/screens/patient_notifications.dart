@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../features/auth/bloc/auth_bloc.dart';
@@ -15,6 +16,8 @@ class PatientNotificationsScreen extends StatefulWidget {
 }
 
 class _PatientNotificationsScreenState extends State<PatientNotificationsScreen> {
+  List<AppNotification>? _cachedNotifications;
+
   @override
   void initState() {
     super.initState();
@@ -33,16 +36,54 @@ class _PatientNotificationsScreenState extends State<PatientNotificationsScreen>
         leading: IconButton(onPressed: () => context.pop(), icon: const Icon(Icons.arrow_back_ios_new, size: 20)),
         title: Text('Notifications', style: AppTextStyles.titleLg.copyWith(color: AppTheme.onSurface)),
       ),
-      body: BlocBuilder<PatientBloc, PatientState>(
-        builder: (context, state) {
-          if (state is PatientLoading) {
-            return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+      body: BlocListener<PatientBloc, PatientState>(
+        listener: (context, state) {
+          if (state is PatientActionSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message), backgroundColor: AppTheme.secondary),
+            );
+            final auth = context.read<AuthBloc>().state;
+            if (auth is AuthAuthenticated) {
+              context.read<PatientBloc>().add(PatientLoadNotifications(userId: auth.user.id));
+            }
           }
-          if (state is PatientNotificationsLoaded) {
-            return _buildNotificationList(state.notifications);
+          if (state is PatientError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message), backgroundColor: AppTheme.error),
+            );
+            final auth = context.read<AuthBloc>().state;
+            if (auth is AuthAuthenticated) {
+              context.read<PatientBloc>().add(PatientLoadNotifications(userId: auth.user.id));
+            }
           }
-          return const Center(child: Text('No notifications'));
         },
+        child: BlocBuilder<PatientBloc, PatientState>(
+          builder: (context, state) {
+            if (state is PatientNotificationsLoaded) {
+              _cachedNotifications = state.notifications;
+            }
+
+            final isLoading = state is PatientLoading || state is PatientActionSuccess;
+
+            if (_cachedNotifications == null) {
+              if (isLoading) {
+                return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+              }
+              return const Center(child: Text('No notifications'));
+            }
+
+            return Stack(
+              children: [
+                _buildNotificationList(_cachedNotifications!),
+                if (isLoading)
+                  Container(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    child: const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -73,6 +114,7 @@ class _PatientNotificationsScreenState extends State<PatientNotificationsScreen>
   Widget _buildLabRequestCard(AppNotification notification) {
     final requestId = notification.metadata?['request_id'] as String?;
     final patientId = notification.metadata?['patient_id'] as String? ?? '';
+    final testType = notification.metadata?['test_type'] as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -99,19 +141,80 @@ class _PatientNotificationsScreenState extends State<PatientNotificationsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Lab Test Request', style: AppTextStyles.titleMd.copyWith(color: AppTheme.onSurface)),
-                    Text(notification.message, style: AppTextStyles.bodyMd.copyWith(color: AppTheme.outline)),
+                    if (testType != null)
+                      Text('Test: $testType', style: AppTextStyles.labelMd.copyWith(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                    Text(notification.message, style: AppTextStyles.bodyMd.copyWith(color: AppTheme.outline), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Text(
+            'Approve to allow the lab to process your sample. This grants read-only access to your test result.',
+            style: AppTextStyles.labelMd.copyWith(color: AppTheme.onSurfaceVariant, fontSize: 11),
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: requestId == null ? null : () {
-                    context.read<PatientBloc>().add(PatientRejectLabRequest(requestId: requestId));
+                  onPressed: () async {
+                    final authState = context.read<AuthBloc>().state;
+                    final currentPatientId = patientId.isNotEmpty
+                        ? patientId
+                        : (authState is AuthAuthenticated ? (authState.user.patientId ?? '') : '');
+                    
+                    String? targetRequestId = requestId;
+                    if (targetRequestId == null || targetRequestId.isEmpty || targetRequestId == 'placeholder') {
+                      try {
+                        final supabase = Supabase.instance.client;
+                        var query = supabase
+                            .from('lab_requests')
+                            .select('id')
+                            .eq('patient_id', currentPatientId)
+                            .eq('status', 'pending');
+                        if (testType != null) {
+                          query = query.eq('test_type', testType);
+                        }
+                        final pending = await query
+                            .order('created_at', ascending: false)
+                            .limit(1)
+                            .maybeSingle();
+                        if (pending != null) {
+                          targetRequestId = pending['id'] as String?;
+                        } else {
+                          final fallbackPending = await supabase
+                              .from('lab_requests')
+                              .select('id')
+                              .eq('patient_id', currentPatientId)
+                              .eq('status', 'pending')
+                              .order('created_at', ascending: false)
+                              .limit(1)
+                              .maybeSingle();
+                          if (fallbackPending != null) {
+                            targetRequestId = fallbackPending['id'] as String?;
+                          }
+                        }
+                      } catch (_) {}
+                    }
+                    
+                    if (targetRequestId != null && targetRequestId.isNotEmpty && targetRequestId != 'placeholder') {
+                      try {
+                        final supabase = Supabase.instance.client;
+                        await supabase
+                            .from('notifications')
+                            .update({'read': true})
+                            .eq('id', notification.id);
+                      } catch (_) {}
+                      if (!mounted) return;
+                      context.read<PatientBloc>().add(PatientRejectLabRequest(requestId: targetRequestId));
+                    } else {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Error: No pending request found to reject.'), backgroundColor: AppTheme.error),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.close, size: 16),
                   label: const Text('Reject'),
@@ -125,11 +228,65 @@ class _PatientNotificationsScreenState extends State<PatientNotificationsScreen>
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: requestId == null ? null : () {
-                    context.read<PatientBloc>().add(PatientApproveLabRequest(
-                      requestId: requestId,
-                      patientId: patientId,
-                    ));
+                  onPressed: () async {
+                    final authState = context.read<AuthBloc>().state;
+                    final currentPatientId = patientId.isNotEmpty
+                        ? patientId
+                        : (authState is AuthAuthenticated ? (authState.user.patientId ?? '') : '');
+                    
+                    String? targetRequestId = requestId;
+                    if (targetRequestId == null || targetRequestId.isEmpty || targetRequestId == 'placeholder') {
+                      try {
+                        final supabase = Supabase.instance.client;
+                        var query = supabase
+                            .from('lab_requests')
+                            .select('id')
+                            .eq('patient_id', currentPatientId)
+                            .eq('status', 'pending');
+                        if (testType != null) {
+                          query = query.eq('test_type', testType);
+                        }
+                        final pending = await query
+                            .order('created_at', ascending: false)
+                            .limit(1)
+                            .maybeSingle();
+                        if (pending != null) {
+                          targetRequestId = pending['id'] as String?;
+                        } else {
+                          final fallbackPending = await supabase
+                              .from('lab_requests')
+                              .select('id')
+                              .eq('patient_id', currentPatientId)
+                              .eq('status', 'pending')
+                              .order('created_at', ascending: false)
+                              .limit(1)
+                              .maybeSingle();
+                          if (fallbackPending != null) {
+                            targetRequestId = fallbackPending['id'] as String?;
+                          }
+                        }
+                      } catch (_) {}
+                    }
+                    
+                    if (targetRequestId != null && targetRequestId.isNotEmpty && targetRequestId != 'placeholder') {
+                      try {
+                        final supabase = Supabase.instance.client;
+                        await supabase
+                            .from('notifications')
+                            .update({'read': true})
+                            .eq('id', notification.id);
+                      } catch (_) {}
+                      if (!mounted) return;
+                      context.read<PatientBloc>().add(PatientApproveLabRequest(
+                        requestId: targetRequestId,
+                        patientId: currentPatientId,
+                      ));
+                    } else {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Error: No pending request found to approve.'), backgroundColor: AppTheme.error),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.check, size: 16),
                   label: const Text('Approve'),

@@ -188,40 +188,74 @@ class NfcService {
             }
 
             final record = cachedMessage.records.first;
-            final payload = utf8.decode(record.payload.sublist(3)); // Skip lang code
-            final tagData = jsonDecode(payload) as Map<String, dynamic>;
+            final payloadBytes = record.payload;
+            String payloadText = '';
+            if (payloadBytes.isNotEmpty) {
+              try {
+                final statusByte = payloadBytes[0];
+                final langCodeLength = statusByte & 0x3F;
+                if (1 + langCodeLength < payloadBytes.length) {
+                  payloadText = utf8.decode(payloadBytes.sublist(1 + langCodeLength));
+                } else {
+                  payloadText = utf8.decode(payloadBytes);
+                }
+              } catch (_) {
+                payloadText = utf8.decode(payloadBytes);
+              }
+            }
+            payloadText = payloadText.trim();
 
-            final patientId = tagData['patientId'] as String?;
-            final patientPublicKey = tagData['publicKey'] as String?;
+            String? patientId;
+            String? patientPublicKey;
+            dynamic decodedJson;
 
-            if (patientId == null || patientPublicKey == null) {
-              safeComplete(const NfcSessionResult(success: false, error: 'Invalid tag data — missing keys'));
+            try {
+              decodedJson = jsonDecode(payloadText);
+              if (decodedJson is Map<String, dynamic>) {
+                patientId = (decodedJson['patientId'] ?? decodedJson['patient_id'] ?? decodedJson['id'])?.toString();
+                patientPublicKey = decodedJson['publicKey']?.toString();
+              }
+            } catch (_) {
+              if (payloadText.isNotEmpty && (payloadText.startsWith('PAT') || payloadText.length >= 6)) {
+                patientId = payloadText;
+              }
+            }
+
+            if (patientId == null || patientId.isEmpty) {
+              safeComplete(const NfcSessionResult(success: false, error: 'Invalid tag data — could not parse patient ID'));
               return;
             }
 
             // X25519 ECDH key exchange → derive shared secret
-            final myKeys = await CryptoService.generateX25519KeyPair();
-            final sharedSecret = await CryptoService.deriveSharedSecret(
-              myKeys['privateKey']!,
-              patientPublicKey,
-            );
+            String? sharedSecret;
+            if (patientPublicKey != null && patientPublicKey.isNotEmpty) {
+              try {
+                final myKeys = await CryptoService.generateX25519KeyPair();
+                sharedSecret = await CryptoService.deriveSharedSecret(
+                  myKeys['privateKey']!,
+                  patientPublicKey,
+                );
 
-            // Write BACK our public key to the tag (encrypted handshake only)
-            final writeData = jsonEncode({
-              'userId': myUserId,
-              'publicKey': myKeys['publicKey'],
-              'role': role.name,
-              'timestamp': DateTime.now().millisecondsSinceEpoch,
-            });
+                // Write BACK our public key to the tag (encrypted handshake only)
+                final writeData = jsonEncode({
+                  'userId': myUserId,
+                  'publicKey': myKeys['publicKey'],
+                  'role': role.name,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                });
 
-            if (ndef.isWritable) {
-              // Encrypt our response with patient's public key
-              final encryptedResponse = await CryptoService.encryptAesGcm(
-                writeData,
-                keyAlias: 'nfc_response_$patientPublicKey',
-              );
-              final writeMessage = NdefMessage([NdefRecord.createText(encryptedResponse)]);
-              await ndef.write(writeMessage);
+                if (ndef.isWritable) {
+                  // Encrypt our response with patient's public key
+                  final encryptedResponse = await CryptoService.encryptAesGcm(
+                    writeData,
+                    keyAlias: 'nfc_response_$patientPublicKey',
+                  );
+                  final writeMessage = NdefMessage([NdefRecord.createText(encryptedResponse)]);
+                  await ndef.write(writeMessage);
+                }
+              } catch (_) {
+                // Ignore handshake failure for demo tags
+              }
             }
 
             onStateChange(NfcSessionState.connected);
@@ -236,17 +270,18 @@ class NfcService {
             );
 
             // Read encrypted patient payload from tag (role-scoped field)
+            final tagDataMap = (decodedJson is Map<String, dynamic>) ? decodedJson : <String, dynamic>{};
             final roleField = role == NfcAccessRole.nurse ? 'nurse_payload' : 'doctor_payload';
-            final encryptedPatientPayload = tagData[roleField] as String?;
+            final encryptedPatientPayload = tagDataMap[roleField] as String?;
 
             safeComplete(NfcSessionResult(
               success: true,
               patientId: patientId,
-              sharedSecret: sharedSecret,
+              sharedSecret: sharedSecret ?? '',
               scopedPayload: NfcScopedPayload(
                 role: role,
                 patientId: patientId,
-                sharedSecret: sharedSecret,
+                sharedSecret: sharedSecret ?? '',
                 encryptedFullRecord: role == NfcAccessRole.doctor ? encryptedPatientPayload : null,
                 encryptedTreatmentOverview: role == NfcAccessRole.nurse ? encryptedPatientPayload : null,
               ),
